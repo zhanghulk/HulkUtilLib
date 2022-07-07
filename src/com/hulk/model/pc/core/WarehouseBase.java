@@ -29,13 +29,20 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	public static final int DEFAULT_PRODUST_CAPACITY = 10;
 	
 	/**
-	 * 产品列表
+	 * 产品列表缓冲区
 	 */
-	protected LinkedList<T> mProducts;
+	protected LinkedList<T> mProductBuffer;
 	/**
 	 * 缓冲区容量
 	 */
 	protected int capacity = DEFAULT_PRODUST_CAPACITY;
+	
+	protected int mMaxCapacity = MAX_PRODUST_CAPACITY;
+	
+	/**
+	 * 容量是否自动增长
+	 */
+	protected volatile boolean mCapacityAuto = false;
 	
 	protected boolean mDebugMode = false;
 	
@@ -43,23 +50,18 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	
 	protected boolean mOnceSleepEnabled = false;
 	
-	protected volatile boolean mProductCacheEmpty = false;
-	protected volatile boolean mProductCacheFull = false;
-	
-	/**
-	 * 做大容量是否自动增长
-	 */
-	protected volatile boolean mCapacityAuto = false;
+	protected volatile boolean mProductBufferEmpty = false;
+	protected volatile boolean mProductBufferFull = false;
 	
 	protected OnWarehouseListener mListener;
 	
 	public WarehouseBase() {
-		this.mProducts = new LinkedList<T>();
+		this.mProductBuffer = new LinkedList<T>();
 	}
 	
 	public WarehouseBase(int capacity, LinkedList<T> products) {
 		this.capacity = capacity;
-		this.mProducts = products;
+		this.mProductBuffer = products;
 	}
 	
 	/**
@@ -68,15 +70,10 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	 */
 	@Override
 	public void put(T product) {
-		synchronized (mProducts) {
-			int maxCapacity = getMaxCapacity();
+		synchronized (mProductBuffer) {
 			try {
-				int size = this.mProducts.size();
-				if(isShowInfoMode()) {
-					SysLog.i(TAG, "put: products size=" + size + ", maxCapacity=" + maxCapacity);
-				}
-				mProductCacheFull = size >= maxCapacity;
-				if(mProductCacheFull) {
+				boolean isFull = checkProductBufferFull();
+				if(isFull) {
 					if(isDebugMode()) {
 						String thread = getCurrentThreadInfo();
 						SysLog.w(TAG, "put: ## products is full, please wait...thread=" + thread);
@@ -84,7 +81,7 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 					if(mListener != null) {
 						mListener.onWarehouseFull(this);
 					}
-					mProducts.wait();
+					mProductBuffer.wait();
 				}
 				
 				//放入数据
@@ -96,7 +93,7 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 				SysLog.e(TAG, "put Interrupted: " + e, e);
 			} finally {
 				//产品放完后，通知其他线程释放锁
-				mProducts.notify();
+				mProductBuffer.notify();
 			}
 		}
 	}
@@ -107,14 +104,14 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	 */
 	@Override
 	public T get() {
-		synchronized (mProducts) {
+		synchronized (mProductBuffer) {
 			try {
-				int size = this.mProducts.size();
 				if(isShowInfoMode()) {
-					SysLog.i(TAG, "get: Current mProducts size=" + size);
+					int size = this.mProductBuffer.size();
+					SysLog.i(TAG, "get: Current mProductBuffer size=" + size);
 				}
-				mProductCacheEmpty = this.checkProductsEmpty();
-				if(mProductCacheEmpty) {
+				mProductBufferEmpty = this.isProductBufferEmpty();
+				if(mProductBufferEmpty) {
 					if(isDebugMode()) {
 						String thread = getCurrentThreadInfo();
 						SysLog.w(TAG, "get: ## products is empty, please wait...thread=" + thread);
@@ -122,7 +119,7 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 					if(mListener != null) {
 						mListener.onWarehouseEmpty(this);
 					}
-					mProducts.wait();
+					mProductBuffer.wait();
 				}
 				
 				//获取数据
@@ -136,7 +133,7 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 				SysLog.e(TAG, "put Interrupted: " + e + ", thread=" + thread, e);
 			} finally {
 				//产品放完后，通知其他线程释放锁
-				mProducts.notify();
+				mProductBuffer.notify();
 			}
 		}
 		return null;
@@ -196,14 +193,18 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	}
 	
 	/**
-	 * 获取最大缓冲区数量
+	 * 获取修正后最大缓冲区数量
 	 * @return
 	 */
-	public int getMaxCapacity() {
+	public int fixMaxCapacity() {
 		if(mCapacityAuto) {
 			//翻一倍
-			capacity = capacity * 2;
-			SysLog.w(TAG, "getMaxCapacity: Capacity auto mode, new max capacity=" + capacity);
+			int fixCapacity = capacity * 2;
+			if(fixCapacity <= mMaxCapacity) {	
+				capacity = fixCapacity;
+				mProductBufferFull = isProductBufferFull();
+				SysLog.w(TAG, "fixMaxCapacity: Fixed capacity=" + capacity + ",  Full=" + mProductBufferFull);
+			}
 		}
 		return this.capacity;
 	}
@@ -212,26 +213,44 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 		this.mCapacityAuto = capacityAuto;
 	}
 	
+	public void setMaxCapacity(int maxCapacity) {
+		this.mMaxCapacity = maxCapacity;
+	}
+	
+	public int getMaxCapacity() {
+		return this.mMaxCapacity;
+	}
+	
 	private void ensureProductsAvailable() {
-		if(mProducts == null) {
-			throw new IllegalStateException("mProducts is null, please create it in constructors");
+		if(mProductBuffer == null) {
+			throw new IllegalStateException("mProductBuffer is null, please create it in constructors");
 		}
 	}
 	
-	public boolean checkProductsEmpty() {
-		return mProducts == null || mProducts.isEmpty();
+	public boolean isProductBufferEmpty() {
+		return mProductBuffer == null || mProductBuffer.isEmpty();
 	}
 	
-	public boolean isProductCacheEmpty() {
-		return mProductCacheEmpty;
+	public boolean checkProductBufferEmpty() {
+		mProductBufferEmpty = isProductBufferEmpty();
+		return mProductBufferEmpty;
 	}
 	
-	public boolean checkProductsFull() {
-		return mProducts != null && mProducts.size() >= capacity;
+	/**
+	 * 检查缓冲区是否满了
+	 * @return
+	 */
+	public boolean checkProductBufferFull() {
+		mProductBufferFull = isProductBufferFull();
+		if(mProductBufferFull) {			
+			//如果已经满了，获取修正后的容量,进行二次检查
+			fixMaxCapacity();
+		}
+		return mProductBufferFull;
 	}
 	
-	public boolean isProductCacheFull() {
-		return mProductCacheFull;
+	public boolean isProductBufferFull() {
+		return mProductBuffer != null && mProductBuffer.size() >= capacity;
 	}
 	
 	/**
@@ -240,7 +259,7 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	 */
 	protected void addProduct(T product) {
 		ensureProductsAvailable();
-		mProducts.add(product);
+		mProductBuffer.add(product);
 	}
 	
 	/**
@@ -250,7 +269,7 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	 */
 	protected void addProduct(int index, T product) {
 		ensureProductsAvailable();
-		mProducts.add(index, product);
+		mProductBuffer.add(index, product);
 	}
 	
 	/**
@@ -262,7 +281,7 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 			return;
 		}
 		ensureProductsAvailable();
-		mProducts.addAll(Arrays.asList(products));
+		mProductBuffer.addAll(Arrays.asList(products));
 	}
 	
 	/**
@@ -274,58 +293,58 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 			return;
 		}
 		ensureProductsAvailable();
-		mProducts.addAll(c);
+		mProductBuffer.addAll(c);
 	}
 	
 	/**
 	 * 移除并返回最前面一个
 	 */
 	protected T removeFistProduct() {
-		if(checkProductsEmpty()) {
+		if(isProductBufferEmpty()) {
 			return null;
 		}
-		return mProducts.removeFirst();
+		return mProductBuffer.removeFirst();
 	}
 	
 	/**
 	 * 移除并返回最后一个
 	 */
 	protected T removeLastProduct() {
-		if(checkProductsEmpty()) {
+		if(isProductBufferEmpty()) {
 			return null;
 		}
-		return mProducts.removeLast();
+		return mProductBuffer.removeLast();
 	}
 	
 	protected T getFirstProduct() {
-		if(checkProductsEmpty()) {
+		if(isProductBufferEmpty()) {
 			return null;
 		}
-		return mProducts.getFirst();
+		return mProductBuffer.getFirst();
 	}
 	
 	protected T getLastProduct() {
-		if(checkProductsEmpty()) {
+		if(isProductBufferEmpty()) {
 			return null;
 		}
-		return mProducts.getLast();
+		return mProductBuffer.getLast();
 	}
 	
 	protected T getProduct(int index) {
-		if(checkProductsEmpty()) {
+		if(isProductBufferEmpty()) {
 			return null;
 		}
-		if(index >= mProducts.size()) {
+		if(index >= mProductBuffer.size()) {
 			return null;
 		}
-		return mProducts.get(index);
+		return mProductBuffer.get(index);
 	}
 	
 	protected int getProductSize() {
-		if(mProducts == null) {
+		if(mProductBuffer == null) {
 			return 0;
 		}
-		int size = mProducts.size();
+		int size = mProductBuffer.size();
 		return size;
 	}
 	

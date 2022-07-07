@@ -141,7 +141,7 @@ public abstract class ProducerBase<T> implements Runnable, IPCModel<T> {
 	
 	public boolean isProductCacheFull() {
 		if(mWarehouse instanceof WarehouseBase) {
-			return ((WarehouseBase)mWarehouse).isProductCacheFull();
+			return ((WarehouseBase)mWarehouse).isProductBufferFull();
 		}
 		return false;
 	}

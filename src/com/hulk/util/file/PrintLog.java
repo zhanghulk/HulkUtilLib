@@ -89,7 +89,7 @@ public class PrintLog {
     private LogConsumer mLogConsumer = null;
     private LogWarehouse mLogWarehouse = null;
 
-    private int mWarehouseSizeMax = 10;
+    private int mWarehouseCapacity = 10;
     
     /**
      * 是否初始化成功的
@@ -727,7 +727,7 @@ public class PrintLog {
      * 强制初始化文件消费者
      */
     public boolean doInitFileConsumer() {
-    	mLogWarehouse = new LogWarehouse(mWarehouseSizeMax, new LinkedList<String>());
+    	mLogWarehouse = new LogWarehouse(mWarehouseCapacity, new LinkedList<String>());
     	mLogConsumer = new LogConsumer(mLogWarehouse);
     	setLogWarehouseCapacityAuto(true);
     	boolean debug = isDebugMode();
@@ -836,13 +836,23 @@ public class PrintLog {
     }
     
     /**
+     * 设置日志仓库容量
+     * @param capacity
+     */
+    public void setLogWarehouseCapacity(int capacity) {
+    	mWarehouseCapacity = capacity;
+    	if(mLogWarehouse != null) {
+    		mLogWarehouse.setCapacity(capacity);
+    	}
+    }
+    
+    /**
      * 设置日志仓库最大容量
      * @param maxCapacity
      */
-    public void setLogWarehouseCapacity(int maxCapacity) {
-    	mWarehouseSizeMax = maxCapacity;
+    public void setLogWarehouseMaxCapacity(int maxCapacity) {
     	if(mLogWarehouse != null) {
-    		mLogWarehouse.setCapacity(maxCapacity);
+    		mLogWarehouse.setMaxCapacity(maxCapacity);
     	}
     }
     
@@ -1285,7 +1295,7 @@ public class PrintLog {
 				+ ", mWriteLogAsyncMode= " + mWriteLogAsyncMode
 				+ ", mLogConsumer= " + mLogConsumer
 				+ ", mLogWarehouse= " + mLogWarehouse
-				+ ", mWarehouseSizeMax= " + mWarehouseSizeMax
+				+ ", mWarehouseCapacity= " + mWarehouseCapacity
 				+ ", mInited= " + mInited
 				+ "]";
     }
