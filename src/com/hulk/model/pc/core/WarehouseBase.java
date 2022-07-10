@@ -22,11 +22,19 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	public static final long DEFAULT_ONCE_SLEEP_TIME = 50;
 	
 	/**
-	 * 缓冲区最大
+	 * 默认缓冲区大小.
 	 */
-	public static final int MAX_PRODUST_CAPACITY = 100;
+	public static final int DEFAULT_PRODUST_CAPACITY = 100;
 	
-	public static final int DEFAULT_PRODUST_CAPACITY = 10;
+	/**
+	 * 缓冲区变化梯度.
+	 */
+	public static final int CAPACITY_GRADIENT_UNIT = DEFAULT_PRODUST_CAPACITY;
+
+	/**
+	 * 缓冲区最大数目
+	 */
+	public static final int MAX_PRODUST_CAPACITY = DEFAULT_PRODUST_CAPACITY + CAPACITY_GRADIENT_UNIT * 100;
 	
 	/**
 	 * 产品列表缓冲区
@@ -34,10 +42,19 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	protected LinkedList<T> mProductBuffer;
 	/**
 	 * 缓冲区容量
+	 * <p>小于等于0时不进行等待
 	 */
 	protected int capacity = DEFAULT_PRODUST_CAPACITY;
 	
+	/**
+	 * 缓冲区容量最大值
+	 */
 	protected int mMaxCapacity = MAX_PRODUST_CAPACITY;
+	
+	/**
+	 * 存放缓存等待是否禁用: 在缓冲区满,如果线程不能等待,就把缓存轻质清除掉,避免等待.
+	 */
+	protected boolean mPutFullWaitingDisabled = false;
 	
 	/**
 	 * 容量是否自动增长
@@ -72,18 +89,12 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	public void put(T product) {
 		synchronized (mProductBuffer) {
 			try {
-				boolean isFull = checkProductBufferFull();
-				if(isFull) {
-					if(isDebugMode()) {
-						String thread = getCurrentThreadInfo();
-						SysLog.w(TAG, "put: ## products is full, please wait...thread=" + thread);
-					}
-					if(mListener != null) {
-						mListener.onWarehouseFull(this);
-					}
+				boolean waitingEnabled = preparePut(product);
+				if(waitingEnabled) {		
+					String thread = getCurrentThreadInfo();
+					SysLog.w(TAG, "put: ## products is full, please wait...thread=" + thread);
 					mProductBuffer.wait();
-				}
-				
+				} 
 				//放入数据
 				doPut(product);
 				
@@ -99,44 +110,36 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	}
 	
 	/**
-	 * 获取产品
-	 * <p>消费者调用，如果仓库缓存列表的产品数量为空，该消费者线程就处于等待状态.
+	 * 准备放入数据缓冲区
+	 * @param product
+	 * @return
+	 * @throws InterruptedException
 	 */
-	@Override
-	public T get() {
-		synchronized (mProductBuffer) {
-			try {
-				if(isShowInfoMode()) {
-					int size = this.mProductBuffer.size();
-					SysLog.i(TAG, "get: Current mProductBuffer size=" + size);
-				}
-				mProductBufferEmpty = this.isProductBufferEmpty();
-				if(mProductBufferEmpty) {
-					if(isDebugMode()) {
-						String thread = getCurrentThreadInfo();
-						SysLog.w(TAG, "get: ## products is empty, please wait...thread=" + thread);
-					}
-					if(mListener != null) {
-						mListener.onWarehouseEmpty(this);
-					}
-					mProductBuffer.wait();
-				}
-				
-				//获取数据
-				T product = doGet();
-				
-				//建议每次睡眠间隔一定时间，避免出现该线程一直占用cup情况
-				doThreadSleep();
-				return product;
-			} catch (InterruptedException e) {
-				String thread = getCurrentThreadInfo();
-				SysLog.e(TAG, "put Interrupted: " + e + ", thread=" + thread, e);
-			} finally {
-				//产品放完后，通知其他线程释放锁
-				mProductBuffer.notify();
-			}
+	protected boolean preparePut(T product) throws InterruptedException {
+		boolean isFull = checkProductBufferFull();
+		if(isFull) {
+			return handlePutFull(product);
 		}
-		return null;
+		return false;
+	}
+	
+	/**
+	 * 处理数据缓冲区
+	 * @param product
+	 * @return 如果需要等待,返回true, 偶然false
+	 * @throws InterruptedException
+	 */
+	protected boolean handlePutFull(T product) throws InterruptedException {
+		doPutFullCallback(product);
+		boolean waitingEnabled = checkPutFullWaitingEnabled();
+		if(!waitingEnabled) {		
+			String thread = getCurrentThreadInfo();
+			//存放缓存等待是否禁用: 在缓冲区满,如果线程不能等待,
+			//就把缓存轻质清除掉,避免内存溢出.
+			SysLog.w(TAG, "handlePutFull: ## products is full, but can clear buffer...thread=" + thread);
+			mProductBuffer.clear();
+		}
+		return waitingEnabled;
 	}
 	
 	/**
@@ -161,6 +164,85 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	 * @return 如果完全接管放入函数，则返回true，不执行默认添加功能.
 	 */
 	protected abstract boolean onPut(T product);
+	
+	/**
+	 * 检查缓冲区满时,是否启用等待
+	 * @return
+	 */
+	protected boolean checkPutFullWaitingEnabled() {
+		if(mPutFullWaitingDisabled) {
+			return false;
+		}
+		boolean waitingEnabled = true;
+		if(mListener != null) {
+			waitingEnabled = mListener.onPutWaitingEnabled(this);
+		}
+		return waitingEnabled;
+	}
+	
+	/**
+	 * Put满时回调
+	 * @param product
+	 */
+	protected void doPutFullCallback(T product) {
+		if(mListener != null) {
+			mListener.onPutFull(this, product);
+		}
+	}
+	
+	/**
+	 * 获取产品
+	 * <p>消费者调用，如果仓库缓存列表的产品数量为空，该消费者线程就处于等待状态.
+	 */
+	@Override
+	public T get() {
+		synchronized (mProductBuffer) {
+			try {
+				//准备获取
+				prepareGet();
+				
+				//获取数据
+				T product = doGet();
+				
+				//建议每次睡眠间隔一定时间，避免出现该线程一直占用cup情况
+				doThreadSleep();
+				return product;
+			} catch (InterruptedException e) {
+				String thread = getCurrentThreadInfo();
+				SysLog.e(TAG, "put Interrupted: " + e + ", thread=" + thread, e);
+			} finally {
+				//产品放完后，通知其他线程释放锁
+				mProductBuffer.notify();
+			}
+		}
+		return null;
+	}
+	
+	protected void prepareGet() throws InterruptedException {
+		if(isShowInfoMode()) {
+			int size = this.mProductBuffer.size();
+			SysLog.i(TAG, "prepareGet: Current mProductBuffer size=" + size);
+		}
+		mProductBufferEmpty = this.isProductBufferEmpty();
+		if(mProductBufferEmpty) {
+			doGetEmptyCallback();
+			if(isDebugMode()) {
+				String thread = getCurrentThreadInfo();
+				SysLog.w(TAG, "prepareGet: ## products is empty, please wait...thread=" + thread);
+			}
+			mProductBuffer.wait();
+		}
+	}
+	
+	/**
+	 * Get为空时回调
+	 * @param product
+	 */
+	protected void doGetEmptyCallback() {
+		if(mListener != null) {
+			mListener.onGetEmpty(this);
+		}
+	}
 	
 	/**
 	 * 执行具体的获取数据
@@ -198,9 +280,9 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	 */
 	public int fixMaxCapacity() {
 		if(mCapacityAuto) {
-			//翻一倍
-			int fixCapacity = capacity * 2;
-			if(fixCapacity <= mMaxCapacity) {	
+			//每次增加一个变化梯度
+			int fixCapacity = capacity + CAPACITY_GRADIENT_UNIT;
+			if(fixCapacity < mMaxCapacity) {	
 				capacity = fixCapacity;
 				mProductBufferFull = isProductBufferFull();
 				SysLog.w(TAG, "fixMaxCapacity: Fixed capacity=" + capacity + ",  Full=" + mProductBufferFull);
@@ -241,6 +323,9 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	 * @return
 	 */
 	public boolean checkProductBufferFull() {
+		if(capacity <= 0) {
+			return false;
+		}
 		mProductBufferFull = isProductBufferFull();
 		if(mProductBufferFull) {			
 			//如果已经满了，获取修正后的容量,进行二次检查
@@ -407,9 +492,24 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
     	return this.mShowInfoMode;
     }
     
-    public void setListener(OnWarehouseListener listener) {
+    public void setListener(OnWarehouseListener<?> listener) {
     	mListener = listener;
 	}
+    
+    /**
+     * 设置存放缓存等待是否禁用: 在缓冲区满,如果线程不能等待,就把缓存轻质清除掉,避免等待.
+     * @param putFullWaitingDisabled
+     */
+    public void setPutFullWaitingDisabled(boolean putFullWaitingDisabled) {
+    	this.mPutFullWaitingDisabled = putFullWaitingDisabled;
+    }
+    
+    /**
+     * 禁用存放缓存等待: 在缓冲区满,如果线程不能等待,就把缓存轻质清除掉,避免等待.
+     */
+    public void disablePutFullWaiting() {
+    	this.mPutFullWaitingDisabled = true;
+    }
     
     protected void logProductInfo(String tag, String func, String product) {
 		String thread = getCurrentThreadInfo();

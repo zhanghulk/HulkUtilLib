@@ -857,6 +857,25 @@ public class PrintLog {
     }
     
     /**
+     * 设置存放缓存等待是否禁用: 在缓冲区满,如果线程不能等待,就把缓存轻质清除掉,避免等待.
+     * @param putFullWaitingDisabled
+     */
+    public void setLogWarehousePutFullWaitingDisabled(boolean putFullWaitingDisabled) {
+    	if(mLogWarehouse != null) {
+    		mLogWarehouse.setPutFullWaitingDisabled(putFullWaitingDisabled);
+    	}
+    }
+    
+    /**
+     * 禁用存放缓存等待: 在缓冲区满,如果线程不能等待,就把缓存轻质清除掉,避免等待.
+     */
+    public void disableLogWarehousePutFullWaiting() {
+    	if(mLogWarehouse != null) {
+    		mLogWarehouse.disablePutFullWaiting();
+    	}
+    }
+    
+    /**
      * 设置日志仓库容量自动模式
      * @param capacityAuto
      */
