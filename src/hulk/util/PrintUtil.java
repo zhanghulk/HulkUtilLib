@@ -242,7 +242,7 @@ public class PrintUtil {
      * @return
      */
 	public static String getLogCurentTime() {
-    	return TxtFileUtil.formatTimeMillisecond(System.currentTimeMillis());
+    	return HulkDateUtil.formatTimeMillisecond(System.currentTimeMillis());
     }
 	
 	/**

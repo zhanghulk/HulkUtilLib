@@ -34,7 +34,7 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	/**
 	 * 缓冲区最大数目
 	 */
-	public static final int MAX_PRODUST_CAPACITY = DEFAULT_PRODUST_CAPACITY + CAPACITY_GRADIENT_UNIT * 100;
+	public static final int MAX_PRODUST_CAPACITY = DEFAULT_PRODUST_CAPACITY + CAPACITY_GRADIENT_UNIT * 10;
 	
 	/**
 	 * 产品列表缓冲区
@@ -89,11 +89,12 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	public void put(T product) {
 		synchronized (mProductBuffer) {
 			try {
-				boolean waitingEnabled = preparePut(product);
-				if(waitingEnabled) {		
-					String thread = getCurrentThreadInfo();
-					SysLog.w(TAG, "put: ## products is full, please wait...thread=" + thread);
-					mProductBuffer.wait();
+				boolean prepared = preparePut(product);
+				if(!prepared) {
+					//如果缓冲区已经满了,且不能等待,此时表示未准备好,
+					//此时,这个产品不能放进去,系统日志打印出来,避免Android场景出现ANR
+					SysLog.i(TAG, "put: Not prepared, Can not put product=" + product);
+					return;
 				} 
 				//放入数据
 				doPut(product);
@@ -111,35 +112,32 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	
 	/**
 	 * 准备放入数据缓冲区
+	 * <p>如果缓冲区已经满了,且不能等待,此时表示未准备好,这个产品不能放进去;
+	 * <p>注: wait(排队等待)也是准摆好的一种情况.
 	 * @param product
-	 * @return
+	 * @return 如果缓冲区已经满了,且不能等待,此时返回false,默认返回true
 	 * @throws InterruptedException
 	 */
 	protected boolean preparePut(T product) throws InterruptedException {
 		boolean isFull = checkProductBufferFull();
-		if(isFull) {
-			return handlePutFull(product);
+		if(!isFull) {
+			//不满就直接通过
+			return true;
 		}
-		return false;
-	}
-	
-	/**
-	 * 处理数据缓冲区
-	 * @param product
-	 * @return 如果需要等待,返回true, 偶然false
-	 * @throws InterruptedException
-	 */
-	protected boolean handlePutFull(T product) throws InterruptedException {
 		doPutFullCallback(product);
 		boolean waitingEnabled = checkPutFullWaitingEnabled();
-		if(!waitingEnabled) {		
-			String thread = getCurrentThreadInfo();
-			//存放缓存等待是否禁用: 在缓冲区满,如果线程不能等待,
-			//就把缓存轻质清除掉,避免内存溢出.
-			SysLog.w(TAG, "handlePutFull: ## products is full, but can clear buffer...thread=" + thread);
-			mProductBuffer.clear();
+		String thread = getCurrentThreadInfo();
+		SysLog.w(TAG, "preparePut: ## products buffer is full for thread=" + thread);
+		if(waitingEnabled) {		
+			SysLog.w(TAG, "preparePut: waiting is enabled, please waiting a moment for consumed buffer.");
+			mProductBuffer.wait();
+		} else {
+			//存放缓存等待是否禁用: 在缓冲区满,如果线程不能等待,直接略过,避免内存溢出.
+			SysLog.w(TAG, "preparePut: waiting is not enabled");
+			return false;
 		}
-		return waitingEnabled;
+		//默认准比好了
+		return true;
 	}
 	
 	/**
@@ -167,13 +165,20 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	
 	/**
 	 * 检查缓冲区满时,是否启用等待
+	 * <p>主线程默认不能等待,避免android出现ANE
 	 * @return
 	 */
 	protected boolean checkPutFullWaitingEnabled() {
 		if(mPutFullWaitingDisabled) {
 			return false;
 		}
+		String threadName = Thread.currentThread().getName();
+		//默认可等待
 		boolean waitingEnabled = true;
+		if("main".equals(threadName)) {
+			//主线程默认不能等待,在android中,等待会出现ANR
+			waitingEnabled = false;
+		}
 		if(mListener != null) {
 			waitingEnabled = mListener.onPutWaitingEnabled(this);
 		}

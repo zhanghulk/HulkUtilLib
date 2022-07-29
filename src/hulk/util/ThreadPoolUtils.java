@@ -1,6 +1,7 @@
 package hulk.util;
 
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -11,7 +12,7 @@ import java.util.concurrent.TimeUnit;
  * @Time: 2021-05-29 15:52
  */
 public class ThreadPoolUtils {
-    /**
+	/**
      *  通过线程池进行需要在线程中进行的操作；此线程池类似于newCachedThreadPool创建的线程池，
      *  只是调整了corePoolSize数量，降低了最大线程数量的限制，
      *  同时任务被拒绝时，舍弃任务（默认会抛RejectedExecutionException异常）；
@@ -20,10 +21,24 @@ public class ThreadPoolUtils {
             60L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), new ThreadPoolExecutor.DiscardPolicy());
 
     /**
+     * 单线程队列执行模式的线程池
+     */
+    private static final ExecutorService SINGLE_THREAD_POOL_EXECUTOR = Executors.newSingleThreadExecutor();
+
+    /**
      * 在线程池中执行异步任务
      * @param command object of Runnable.
      */
     public static void execute(Runnable command) {
         THREAD_POOL_EXECUTOR.execute(command);
+    }
+
+    /**
+     * 执行单线程队列执行模式的线程池
+     * <p>线程不会立刻执行,排队执行
+     * @param command
+     */
+    public static void executeSingle(Runnable command) {
+        SINGLE_THREAD_POOL_EXECUTOR.execute(command);
     }
 }

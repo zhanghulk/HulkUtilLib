@@ -7,12 +7,11 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 
 import hulk.text.TextUtils;
+import hulk.util.HulkDateUtil;
 import hulk.util.PrintUtil;
 
 public class TxtFileUtil {
@@ -22,36 +21,12 @@ public class TxtFileUtil {
 	public static final String ENCODING = "UTF-8";
 	
 	/**
-	 * 读取Assets目录下的文本文件内容
-	 * @param input
-	 * @param fileName
-	 * @param original  是否保持原来的文本格式(保持文件中原样的文文本字符串，保持有换行符和首尾空格)
-	 * @return
+	 * 换行符,默认"\n"
 	 */
-	public static String readAssetsFile(InputStream input, String fileName, boolean original){
-        if (!TextUtils.isEmpty(fileName)) {
-			try {
-				if (input != null) {
-					if (original) {
-						return readOriginal(input);
-					} else {
-						return readNoSpace(input);
-					}
-				} else {
-					PrintUtil.e(TAG, "AssetsFile InputStream is null, fileName: " + fileName);
-				}
-			} catch (Exception e) {
-				PrintUtil.e(TAG, "readAssetsFile failed: " + e + ", from " + fileName, e);
-			} finally {
-				if(input != null){
-	                try{
-	                    input.close();
-	                }catch(IOException ioe){
-	                }
-	            }
-			}
-        }
-        return "";
+	public static String sNewlineCharacter = "\n";
+	
+	public static void setNewlineCharacter(String newlineCharacter) {
+    	sNewlineCharacter = newlineCharacter;
     }
 	
 	/**
@@ -60,52 +35,99 @@ public class TxtFileUtil {
 	 * @param original 是否保持原来的文本格式(保持文件中原样的文文本字符串，保持有换行符和首尾空格)
 	 * @return
 	 */
-	public static String readFile(String filePath, boolean original){
-        if (!TextUtils.isEmpty(filePath)) {
-        	InputStream input = null;
-			try {
-				input = new FileInputStream(filePath);
-				if (input != null) {
-					if (original) {
-						return readOriginal(input);
-					} else {
-						return readNoSpace(input);
-					}
-				}
-			} catch (IOException e) {
-				PrintUtil.e(TAG, "reaFile: " + e + ", from " + filePath, e);
-			} finally {
-				if(input != null){
-	                try{
-	                    input.close();
-	                }catch(IOException ioe){
-	                }
-	            }
-			}
+	public static String readFile(String filePath, boolean original) {
+		if (TextUtils.isEmpty(filePath)) {
+        	throw new IllegalArgumentException("Empty filePath=" + filePath);
         }
+		File file = new File(filePath);
+		if (!file.exists()) {
+			PrintUtil.w(TAG, "readFile: Not exists file=" + file);
+			return null;
+		}
+		InputStream input = null;
+		try {
+			input = new FileInputStream(file);
+			if (input != null) {
+				if (original) {
+					return readInputText(input);
+				} else {
+					return readNoSpace(input);
+				}
+			}
+		} catch (IOException e) {
+			PrintUtil.e(TAG, "reaFile: " + e + ", from " + filePath, e);
+		} finally {
+			if(input != null){
+                try{
+                    input.close();
+                }catch(IOException ioe){
+                }
+            }
+		}
         return "";
     }
 	
 	/**
-	 * 读取文件中原样的文文本字符串,保持原来的文本格式
+	 * 读取普通文件目录下的文本文件内容(SD卡或者data/data/...)
+	 * <p>保持原来的文本格式(保持文件中原样的文文本字符串，保持有换行符和首尾空格)
+	 * @param filePath
+	 * @return
+	 */
+	public static String readFileText(String filePath) {
+		if (TextUtils.isEmpty(filePath)) {
+        	throw new IllegalArgumentException("readFileText: Empty filePath=" + filePath);
+        }
+		File file = new File(filePath);
+		if (!file.exists()) {
+			PrintUtil.w(TAG, "readFileText: Not exists file=" + file);
+			return null;
+		}
+		InputStream input = null;
+		try {
+			input = new FileInputStream(file);
+			return readInputText(input);
+		} catch (IOException e) {
+			PrintUtil.e(TAG, "readFileText: " + e + ", from " + filePath, e);
+		} finally {
+			if(input != null){
+                try{
+                    input.close();
+                }catch(IOException ioe){
+                }
+            }
+		}
+        return "";
+    }
+	
+	/**
+	 * 读取文件中文本数据,保持原来的文本格式
+	 * <p>保持原来的文本格式(保持文件中原样的文文本字符串，保持有换行符和首尾空格)
 	 * @param input
 	 * @return
 	 */
-	public static String readOriginal(InputStream input){
+	public static String readInputText(InputStream input){
 		if (input == null) {
-			return "";
+			throw new IllegalArgumentException("readInputText: input == null");
 		}
-        String text = null;
         BufferedReader reader = null;
+        StringBuffer buff = new StringBuffer();
         try {
             reader = new BufferedReader(new InputStreamReader(input, ENCODING));
-            int fileLen = input.available();
-            char[] chars = new char[fileLen];
-            int readCount = reader.read(chars);
-            PrintUtil.i(TAG, "readOriginal: " + ", fileLen= " + fileLen + ", readCount= " + readCount);
-            text = new String(chars);
+            String line;
+            int lineCount = 0;
+            while ((line = reader.readLine()) != null) {
+            	lineCount++;
+            	if(lineCount > 1) {
+            		//从第二行开始,每次在签名加上换行符
+            		buff.append(sNewlineCharacter);
+            	}
+            	buff.append(line);
+			}
+            String text = buff.toString();
+            PrintUtil.i(TAG, "readInputText: text length= " + buff.length() + ", lineCount=" + lineCount);
+            return text;
         } catch (Exception e) {
-            PrintUtil.e(TAG, "readOriginal Exception: " + e);
+            PrintUtil.e(TAG, "readInputText Exception: " + e);
         } finally {
             if(reader != null){
                 try{
@@ -114,7 +136,7 @@ public class TxtFileUtil {
                 }
             }
         }
-        return text;
+        return "";
     }
 
 	/**
@@ -124,7 +146,7 @@ public class TxtFileUtil {
 	 */
 	public static String readNoSpace(InputStream input){
 		if (input == null) {
-			return "";
+			throw new IllegalArgumentException("readNoSpace: input == null");
 		}
         BufferedReader reader = null;
         StringBuffer buff = new StringBuffer();
@@ -149,30 +171,36 @@ public class TxtFileUtil {
     }
 	
 	public static List<String> readLineList(String filePath){
-        if (!TextUtils.isEmpty(filePath)) {
-        	InputStream input = null;
-			try {
-				input = new FileInputStream(filePath);
-				if (input != null) {
-					return readLines(input);
-				}
-			} catch (IOException e) {
-				PrintUtil.e(TAG, "reaFile: " + e + ", from " + filePath);
-			} finally {
-				if(input != null){
-	                try{
-	                    input.close();
-	                }catch(IOException ioe){
-	                }
-	            }
+		if (TextUtils.isEmpty(filePath)) {
+			throw new IllegalArgumentException("readLineList: InvalidfilePath=" + filePath);
+		}
+		File file = new File(filePath);
+		if (!file.exists()) {
+			PrintUtil.w(TAG, "readLineList: Not exists file=" + file);
+			return null;
+		}
+		InputStream input = null;
+		try {
+			input = new FileInputStream(file);
+			if (input != null) {
+				return readLines(input);
 			}
-        }
+		} catch (IOException e) {
+			PrintUtil.e(TAG, "readLineList: " + e + ", from " + filePath);
+		} finally {
+			if(input != null){
+                try{
+                    input.close();
+                }catch(IOException ioe){
+                }
+            }
+		}
         return null;
     }
 	
 	public static List<String> readLines(InputStream input){
 		if (input == null) {
-			return null;
+			throw new IllegalArgumentException("readLines: input == null");
 		}
 		List<String> lines = new ArrayList<String>();
         BufferedReader reader = null;
@@ -180,9 +208,9 @@ public class TxtFileUtil {
             reader = new BufferedReader(new InputStreamReader(input, ENCODING));
             String line;
             while ((line = reader.readLine()) != null) {
-            	PrintUtil.i(TAG, "read list line: " + line);
-            	lines.add(line.trim());
+            	lines.add(line);
 			}
+            PrintUtil.i(TAG, "readLineList lines size: " + lines.size());
         } catch (Exception e) {
             PrintUtil.e(TAG, "readLineList Exception: " + e);
         } finally {
@@ -213,91 +241,46 @@ public class TxtFileUtil {
 	}
 
 	public static boolean write(String text, String filePath) throws Exception {
-        if (text != null && text.length() > 0) {
-            FileWriter writer = null;
-            try {
-                File file = new File(filePath);
-                if (file.exists()) {
-                    boolean del = file.delete();
-                    PrintUtil.w(TAG, "writeTextToFile old file deleted= " + del);
+        if (text == null || text.length() < 0) {
+        	PrintUtil.w(TAG, "write: Invalid text=" + text);
+			return false;
+        }
+        FileWriter writer = null;
+        try {
+            File file = new File(filePath);
+            if (file.exists()) {
+                boolean del = file.delete();
+                PrintUtil.w(TAG, "writeTextToFile old file deleted= " + del);
+            }
+            File pDir = file.getParentFile();
+            if (!pDir.exists()) {
+            	boolean mkdirs = pDir.mkdirs();
+            	PrintUtil.w(TAG, "create parent file mkdirs= " + mkdirs);
+                if (!mkdirs) {
+                	String err = "Failed to create parent dir: " + pDir
+                    		+ ", please check Manifest whether has permissin to write storage";
+                    PrintUtil.e(TAG, err);
+                    throw new RuntimeException(err);
                 }
-                File pDir = file.getParentFile();
-                if (!pDir.exists()) {
-                	boolean mkdirs = pDir.mkdirs();
-                	PrintUtil.w(TAG, "create parent file mkdirs= " + mkdirs);
-                    if (!mkdirs) {
-                    	String err = "Failed to create parent dir: " + pDir
-                        		+ ", please check Manifest whether has permissin to write storage";
-                        PrintUtil.e(TAG, err);
-                        throw new RuntimeException(err);
-                    }
-                }
-                writer = new FileWriter(file);
-                writer.write(text);
-                PrintUtil.i(TAG, "write Text: " + text + " >>> file path: " + filePath);
-                return true;
-            } catch (Exception e) {
-                PrintUtil.e(TAG, "writeTextToFile Exception: " + e + ", text: " + text, e);
-                throw e;
-            }finally{
-                if(writer!=null){
-                    try{
-                        writer.close();
-                    }catch(IOException ioe){
-                        //ignored
-                    }
+            }
+            writer = new FileWriter(file);
+            writer.write(text);
+            PrintUtil.i(TAG, "write Text: " + text + " >>> file path: " + filePath);
+            return true;
+        } catch (Exception e) {
+            PrintUtil.e(TAG, "writeTextToFile Exception: " + e + ", text: " + text, e);
+            throw e;
+        }finally{
+            if(writer!=null){
+                try{
+                    writer.close();
+                }catch(IOException ioe){
+                    //ignored
                 }
             }
         }
-        return false;
     }
 	
-	/**
-     * format time as "yyyy-MM-dd HH:mm:ss"
-     * @param timeMillis
-     * @return
-     */
-	public static String formatTimeSecond(long timeMillis) {
-        DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        return df.format(timeMillis);
-    }
-	
-	/**
-     * get current time as "yyyy-MM-dd HH:mm:ss.SSS"
-     * @return
-     */
-	public static String getCurrentMillisecond() {
-		return formatTimeMillisecond(System.currentTimeMillis());
-    }
-	
-	/**
-     * format time as "yyyy-MM-dd HH:mm:ss.SSS"
-     * @param timeMillis
-     * @return
-     */
-	public static String formatTimeMillisecond(long timeMillis) {
-        DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-        return df.format(timeMillis);
-    }
-    
-    /**
-     * format time as long value: yyyyMMdd_HHmmss
-     * @return
-     */
-    public static String formatTimeSecondStr(long timeMillis) {
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
-		return sdf.format(timeMillis);
-	}
-    
-    /**
-     * format time as yyyyMMdd
-     * @return
-     */
-    public static String formatDateStr(long timeMillis) {
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
-		return sdf.format(timeMillis);
-	}
-    
     /**
      * 创建文件名文件名: yyyyMMdd.txt or yyyyMMdd_HHmmss.txt
      * @param dir
@@ -353,7 +336,7 @@ public class TxtFileUtil {
     	if(millis <= 0) {
     		millis = System.currentTimeMillis();
     	}
-    	return TxtFileUtil.formatDateStr(millis) + extension;
+    	return HulkDateUtil.formatDateStr(millis) + extension;
     }
     
     /**
@@ -366,7 +349,7 @@ public class TxtFileUtil {
     	if(millis <= 0) {
     		millis = System.currentTimeMillis();
     	}
-    	return TxtFileUtil.formatTimeSecondStr(millis) + extension;
+    	return HulkDateUtil.formatTimeSecondStr(millis) + extension;
     }
     
     /**
@@ -382,5 +365,9 @@ public class TxtFileUtil {
     		return path;
     	}
     	return srcPath;
+    }
+    
+    public static String formatTimeMillisecond(long timeMillis) {
+    	return HulkDateUtil.formatTimeMillisecond(timeMillis);
     }
 }
