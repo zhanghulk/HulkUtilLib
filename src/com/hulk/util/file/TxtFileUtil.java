@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import hulk.text.TextUtils;
-import hulk.util.HulkDateUtil;
+import hulk.util.DateTimeUtil;
 import hulk.util.PrintUtil;
 
 public class TxtFileUtil {
@@ -336,7 +336,7 @@ public class TxtFileUtil {
     	if(millis <= 0) {
     		millis = System.currentTimeMillis();
     	}
-    	return HulkDateUtil.formatDateStr(millis) + extension;
+    	return DateTimeUtil.formatDateStr(millis) + extension;
     }
     
     /**
@@ -349,7 +349,7 @@ public class TxtFileUtil {
     	if(millis <= 0) {
     		millis = System.currentTimeMillis();
     	}
-    	return HulkDateUtil.formatTimeSecondStr(millis) + extension;
+    	return DateTimeUtil.formatTimeSecond(millis) + extension;
     }
     
     /**
@@ -368,6 +368,6 @@ public class TxtFileUtil {
     }
     
     public static String formatTimeMillisecond(long timeMillis) {
-    	return HulkDateUtil.formatTimeMillisecond(timeMillis);
+    	return DateTimeUtil.formatTimeMillisecond(timeMillis);
     }
 }

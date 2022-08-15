@@ -4,8 +4,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.Arrays;
 
-import com.hulk.util.file.TxtFileUtil;
-
 import hulk.text.TextUtils;
 
 /**
@@ -15,7 +13,10 @@ import hulk.text.TextUtils;
  */
 public class PrintUtil {
 	
-	private static String TAG = "PrintUtil";
+	private static final String TAG = "PrintUtil";
+	public static final byte[] NEW_LINE_CHAR_DATA = "\n".getBytes();
+	public static final String ANDROID_LOG_FORMAT = "%s %s %s/%s: %s";
+	public static final String ANDROID_LOG_FORMAT_NEW_LINE = "\n%s %s %s/%s: %s";
 	
 	public static void v(String tag, String text) {
 		v(tag, text, null);
@@ -79,22 +80,48 @@ public class PrintUtil {
         return formatLogStr(level, tag, text, null);
     }
 	
+	/**
+	 * 格式化日志字符串 "%s %s %s/%s: %s"
+	 * @param level
+	 * @param tag
+	 * @param text
+	 * @param threadInfo
+	 * @return
+	 */
 	public static String formatLogStr(String level, String tag, String text, String threadInfo) {
-    	StringBuffer buff = new StringBuffer();
-    	buff.append(getLogCurentTime());
-    	String tStr = "";
-    	if(threadInfo == null || threadInfo.equals("")) {
-    		Thread t = Thread.currentThread();
-    		tStr = t.getName() + "-" + t.getId();
-    	} else {
-    		tStr = threadInfo;
-    	}
-    	if(tStr != null && !tStr.equals("")) {
-    		buff.append("  ").append(tStr);
-    	}
-    	buff.append("  ").append(level);
-    	buff.append("  ").append(tag).append(": ").append(text);
-        return buff.toString();
+    	return formatStr(ANDROID_LOG_FORMAT, level, tag, text, threadInfo);
+    }
+	
+	/**
+	 * 格式化日志字符串 "\n%s %s %s/%s: %s"
+	 * @param level
+	 * @param tag
+	 * @param text
+	 * @param threadInfo
+	 * @return
+	 */
+	public static String formatLogStrNewLine(String level, String tag, String text, String threadInfo) {
+    	return formatStr(ANDROID_LOG_FORMAT_NEW_LINE, level, tag, text, threadInfo);
+    }
+	
+	/**
+	 * 格式化字符串
+	 * @param format 格式 eg: "%s %s %s/%s: %s" or "\n%s %s %s/%s: %s"
+	 * @param level
+	 * @param tag
+	 * @param text
+	 * @param threadInfo
+	 * @return
+	 */
+	public static String formatStr(String format, String level, String tag, String text, String threadInfo) {
+		if(TextUtils.isEmpty(format)) {
+			throw new IllegalArgumentException("format is empty");
+		}
+    	String timeStr = getLogCurentTime();
+    	String tStr = fixThreadInfo(threadInfo);
+    	//"%s %s %s/%s: %s" or "\n%s %s %s/%s: %s"
+    	String msg = String.format(format, timeStr, tStr, level, tag, text);
+        return msg;
     }
 	
 	/**
@@ -195,21 +222,20 @@ public class PrintUtil {
      * @return
      */
     public static String formatStackTrace(String text, Throwable e) {
+        if (text == null) {
+            return text;
+        }
         if (e == null) {
             return text;
         }
         ByteArrayOutputStream baos = null;
         try {
             baos = new ByteArrayOutputStream();
-            if (text != null) {
-            	text = text + "\n";
-                //text放在e的trace上面
-                baos.write(text.getBytes());
-            }
+            //text放在e的trace上面
+            baos.write(text.getBytes());
+            baos.write(NEW_LINE_CHAR_DATA);
             PrintStream ps = new PrintStream(baos);
-            if (e != null) {
-                e.printStackTrace(ps);
-            }
+            e.printStackTrace(ps);
             String str = baos.toString();
             return str;
         } catch (Exception ex) {
@@ -242,7 +268,7 @@ public class PrintUtil {
      * @return
      */
 	public static String getLogCurentTime() {
-    	return HulkDateUtil.formatTimeMillisecond(System.currentTimeMillis());
+    	return DateTimeUtil.formatTimeMillisecond(System.currentTimeMillis());
     }
 	
 	/**
@@ -270,4 +296,18 @@ public class PrintUtil {
         String msg = builder.toString();
         return msg;
     }
+    
+    /**
+     * 修复线程信息：如果为null取当前线程信息
+     * @param threadInfo
+     * @return
+     */
+    public static String fixThreadInfo(String threadInfo) {
+		if(threadInfo != null && !threadInfo.equals("")) {
+			return threadInfo;
+		}
+		Thread t = Thread.currentThread();
+		String tStr = t.getName() + "-" + t.getId();
+		return tStr;
+	}
 }

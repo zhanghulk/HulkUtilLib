@@ -14,6 +14,7 @@ import java.util.LinkedList;
 public abstract class WarehouseBase<T> implements IWarehouse<T> {
 
 	private static final String TAG = "WarehouseBase";
+	private static final String PRODUCT_INFO_FORMAT = "%s: productStrLength=%d, bufferSize=%d, thread=%s";
 	
 	/**
 	 * 默认一次获取或者存放睡眠时间，避免一直占用CPN导致程序占用套多资源
@@ -431,8 +432,12 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
 	}
 	
 	protected int getProductSize() {
+		return getProductBufferSize();
+	}
+	
+	protected int getProductBufferSize() {
 		if(mProductBuffer == null) {
-			return 0;
+			return -1;
 		}
 		int size = mProductBuffer.size();
 		return size;
@@ -517,8 +522,18 @@ public abstract class WarehouseBase<T> implements IWarehouse<T> {
     }
     
     protected void logProductInfo(String tag, String func, String product) {
+    	String msg = buildProductInfo(func, product);
+		SysLog.i(tag, msg);
+	}
+    
+    public String buildProductInfo(String func, String product) {
+    	if(product == null) {
+    		return "null";
+    	}
 		String thread = getCurrentThreadInfo();
-		int size = getProductSize();
-		SysLog.i(tag, func + ": product=" + product + ", size=" + size + ", thread=" + thread);
+		int bufferSize = getProductBufferSize();
+		int productLength = product.length();
+		String msg = String.format(PRODUCT_INFO_FORMAT, func, productLength, bufferSize, thread);
+		return msg;
 	}
 }

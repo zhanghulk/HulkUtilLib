@@ -29,6 +29,10 @@ public class LogConsumer extends ConsumerBase<String> {
 		this.mAppend = append;
 	}
 	
+	public boolean isAppendMode() {
+		return this.mAppend;
+	}
+	
 	public void setTxtFile(TxtFile txtFile) {
 		this.mTxtFile = txtFile;
 	}

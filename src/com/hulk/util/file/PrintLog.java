@@ -3,12 +3,11 @@ package com.hulk.util.file;
 import com.hulk.util.common.FileUtils;
 import com.hulk.util.file.TxtFile;
 
-import hulk.util.HulkDateUtil;
+import hulk.util.DateTimeUtil;
 import hulk.util.PrintUtil;
 
 import com.hulk.model.pc.core.OnWarehouseListener;
 import com.hulk.model.pc.core.SysLog;
-import com.hulk.model.pc.test.HulkTestConsumer;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -62,6 +61,7 @@ public class PrintLog {
     boolean bufferMode = false;
     int bufferLength = DEFAULT_BUFFER_LENGTH;
     StringBuffer buffer;
+    Object mBufferLock = new Object();
     //是否每次新起一行
     boolean lineMode = true;
     
@@ -492,11 +492,9 @@ public class PrintLog {
      * @throws Exception
      */
     public int doFlush() throws Exception {
-    	if(buffer == null) {
-    		//Ignored invalid buffer
-    		return 0;
-    	}
-		String str = buffer.toString();
+    	//及时清空buffer，避免缓存越来越大，占用资源
+		String str = getBufferStr();
+    	int len = clearBuffer();
     	if(str == null || str.equals("")) {
     		return 0;
     	}
@@ -504,8 +502,6 @@ public class PrintLog {
     		PrintUtil.w(TAG, "##doFlush: Not Async ModeAnd current wirting. next time to write.");
     		return 0;
     	}
-    	//及时清空buffer，避免缓存越来越大，占用资源
-    	int len = clearBuffer();
     	// write text and clear buffer
     	boolean written = writeToFile(str, true);
     	if(!written) {
@@ -554,11 +550,38 @@ public class PrintLog {
     	return false;
     }
     
+    
+    /**
+     * 获取缓冲区的数据
+     * @return
+     */
+    public String getBufferStr() {
+    	if(buffer == null) {
+    		return "";
+    	}
+    	return buffer.toString();
+    }
+    
+    /**
+     * 获取缓冲区的数据
+     * @param isClear 是否清空 （及时清空buffer，避免缓存越来越大，占用资源）
+     * @return
+     */
+    public String getBufferStr(boolean isClear) {
+    	String str = getBufferStr();
+		//及时清空buffer，避免缓存越来越大，占用资源
+    	clearBuffer();
+    	return str;
+    }
+    
     /**
      * 清空缓存数据
      * @return cleared string length
      */
     public int clearBuffer() {
+    	if(buffer == null) {
+    		return -1;
+    	}
     	if(isBufferEmpty()) {
     		//Ignored invalid buffer
     		return 0;
@@ -656,9 +679,8 @@ public class PrintLog {
     		SysLog.e(TAG, "writeToFileAsync: Log consumer is not starting");
     		return false;
     	}
-    	if(mLogConsumer != null) {
-    		mLogConsumer.setAppend(append);
-    	} 
+    	//没必要每次都修改一次浪费资源
+    	//setLogConsumerAppend(append);
     	if(mLogWarehouse != null) {
     		//日志放入仓库,排队等待消费者(mLogConsumer)写入文件.
     		mLogWarehouse.put(text);
@@ -715,11 +737,16 @@ public class PrintLog {
      */
     public void init() {
 		try {
+			PrintUtil.i(TAG, "init： Starting.");
+			if(mWriteLogAsyncMode) {
+				PrintUtil.i(TAG, "init： init Log Consumer");
+				initLogConsumer();
+			}
 			//确保日志文件存在
 			initLogFile();
-			initLogConsumer();
 			renderFiles();
 			mInited = true;
+			PrintUtil.i(TAG, "init： Finsihed.");
 		} catch (Throwable e) {
 			PrintUtil.e(TAG, "init failed: " + e, e);
 		}
@@ -786,6 +813,19 @@ public class PrintLog {
     			mLogConsumer.setTxtFile(txtFile);
     		} 
     	}
+    }
+    
+    public void setLogConsumerAppend(boolean append) {
+    	if(mLogConsumer != null) {
+    		mLogConsumer.setAppend(append);
+    	}
+    }
+    
+    public boolean isLogConsumerAppendMode() {
+    	if(mLogConsumer != null) {
+    		return mLogConsumer.isAppendMode();
+    	}
+    	return false;
     }
     
     /**
@@ -1263,7 +1303,7 @@ public class PrintLog {
     	//若果按照日期命名的文件不是今天的，就使用重新创建文件
     	if(mTxtFile != null && mTxtFile.exists()) {
     		long now = System.currentTimeMillis();
-    		String todayStr = HulkDateUtil.formatDateStr(now);
+    		String todayStr = DateTimeUtil.formatDateStr(now);
     		String filepath = mTxtFile.getFilePath();
 			if(!filepath.contains(todayStr)) {
 				mTxtFile = createNewFile(false);
