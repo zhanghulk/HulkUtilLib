@@ -16,6 +16,7 @@ public class PrintUtil {
 	private static final String TAG = "PrintUtil";
 	public static final byte[] NEW_LINE_CHAR_DATA = "\n".getBytes();
 	public static final String ANDROID_LOG_FORMAT = "%s %s %s/%s: %s";
+	public static final String ANDROID_LOG_FORMAT_NEW_LINE = "\n%s %s %s/%s: %s";
 	
 	public static void v(String tag, String text) {
 		v(tag, text, null);
@@ -79,23 +80,48 @@ public class PrintUtil {
         return formatLogStr(level, tag, text, null);
     }
 	
+	/**
+	 * 格式化日志字符串 "%s %s %s/%s: %s"
+	 * @param level
+	 * @param tag
+	 * @param text
+	 * @param threadInfo
+	 * @return
+	 */
 	public static String formatLogStr(String level, String tag, String text, String threadInfo) {
-    	String timeStr = getLogCurentTime();
-    	String tStr = fixThreadInfo(threadInfo);
-    	//"%s %s %s/%s: %s"
-    	String msg = String.format(ANDROID_LOG_FORMAT, timeStr, tStr, level, tag, text);
-        return msg;
+    	return formatStr(ANDROID_LOG_FORMAT, level, tag, text, threadInfo);
     }
 	
-	public static String formatLogStr2(String level, String tag, String text, String threadInfo) {
-    	StringBuffer buff = new StringBuffer();
+	/**
+	 * 格式化日志字符串 "\n%s %s %s/%s: %s"
+	 * @param level
+	 * @param tag
+	 * @param text
+	 * @param threadInfo
+	 * @return
+	 */
+	public static String formatLogStrNewLine(String level, String tag, String text, String threadInfo) {
+    	return formatStr(ANDROID_LOG_FORMAT_NEW_LINE, level, tag, text, threadInfo);
+    }
+	
+	/**
+	 * 格式化字符串
+	 * @param format 格式 eg: "%s %s %s/%s: %s" or "\n%s %s %s/%s: %s"
+	 * @param level
+	 * @param tag
+	 * @param text
+	 * @param threadInfo
+	 * @return
+	 */
+	public static String formatStr(String format, String level, String tag, String text, String threadInfo) {
+		if(TextUtils.isEmpty(format)) {
+			throw new IllegalArgumentException("format is empty");
+		}
     	String timeStr = getLogCurentTime();
-    	buff.append(timeStr);
     	String tStr = fixThreadInfo(threadInfo);
-    	buff.append("  ").append(tStr);
-    	buff.append("  ").append(level);
-    	buff.append("  ").append(tag).append(": ").append(text);
-        return buff.toString();
+    	//"%s %s %s/%s: %s" or "\n%s %s %s/%s: %s"
+    	String msg = String.format(format, timeStr, tStr, level, tag, text);
+        return msg;
     }
 	
 	/**
