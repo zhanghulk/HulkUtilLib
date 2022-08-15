@@ -16,7 +16,11 @@ public class SysLog {
 	/**
 	 * "yyyy-MM-dd HH:mm:ss.SSS"
 	 */
-	private static String DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
+	public static final String MILLI_SECOND_FORMAT_STR = "yyyy-MM-dd HH:mm:ss.SSS";
+	public static final DateFormat TIME_MILLI_SECOND_FORMAT = new SimpleDateFormat(MILLI_SECOND_FORMAT_STR);
+	public static final DateFormat TIME_SECOND_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	public static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+	public static final String ANDROID_LOG_FORMAT = "%s %s %s/%s: %s";
 
 	public static void v(String tag, String text) {
 		v(tag, text, null);
@@ -80,7 +84,7 @@ public class SysLog {
         return formatLogStr(level, tag, text, null);
     }
 	
-	public static String formatLogStr(String level, String tag, String text, String threadInfo) {
+	public static String formatLogStr0(String level, String tag, String text, String threadInfo) {
     	StringBuffer buff = new StringBuffer();
     	buff.append(getLogCurentTime());
     	String tStr = "";
@@ -96,6 +100,14 @@ public class SysLog {
     	buff.append("  ").append(level);
     	buff.append("  ").append(tag).append(": ").append(text);
         return buff.toString();
+    }
+	
+	public static String formatLogStr(String level, String tag, String text, String threadInfo) {
+    	String timeStr = getLogCurentTime();
+    	String tStr = fixThreadInfo(threadInfo);
+    	//"%s %s %s/%s: %s"
+    	String msg = String.format(ANDROID_LOG_FORMAT, timeStr, tStr, level, tag, text);
+        return msg;
     }
 	
 	/**
@@ -247,12 +259,30 @@ public class SysLog {
     }
 	
 	/**
+     * format time as "yyyy-MM-dd"
+     * @param timeMillis
+     * @return
+     */
+	public static String formatDataStr(long timeMillis) {
+        return DATE_FORMAT.format(timeMillis);
+    }
+	
+	/**
+     * format time as "yyyy-MM-dd HH:mm:ss"
+     * @param timeMillis
+     * @return
+     */
+	public static String formatTimeSecond(long timeMillis) {
+        return TIME_SECOND_FORMAT.format(timeMillis);
+    }
+	
+	/**
      * format time as "yyyy-MM-dd HH:mm:ss.SSS"
      * @param timeMillis
      * @return
      */
 	public static String formatTimeMillisecond(long timeMillis) {
-        return formatTimeMillis(timeMillis, DATE_TIME_FORMAT);
+        return TIME_MILLI_SECOND_FORMAT.format(timeMillis);
     }
 	
 	/**
@@ -274,5 +304,19 @@ public class SysLog {
 	public static String getCurrentThreadInfo() {
 		Thread t = Thread.currentThread();
 		return t.getName() + "-" + t.getId();
+	}
+	
+	/**
+     * 修复线程信息：如果为null取当前线程信息
+     * @param threadInfo
+     * @return
+     */
+    public static String fixThreadInfo(String threadInfo) {
+		if(threadInfo != null && !threadInfo.equals("")) {
+			return threadInfo;
+		}
+		Thread t = Thread.currentThread();
+		String tStr = t.getName() + "-" + t.getId();
+		return tStr;
 	}
 }
