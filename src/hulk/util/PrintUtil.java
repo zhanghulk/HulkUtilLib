@@ -4,8 +4,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.Arrays;
 
-import com.hulk.util.file.TxtFileUtil;
-
 import hulk.text.TextUtils;
 
 /**
@@ -244,7 +242,7 @@ public class PrintUtil {
      * @return
      */
 	public static String getLogCurentTime() {
-    	return HulkDateUtil.formatTimeMillisecond(System.currentTimeMillis());
+    	return DateTimeUtil.formatTimeMillisecond(System.currentTimeMillis());
     }
 	
 	/**

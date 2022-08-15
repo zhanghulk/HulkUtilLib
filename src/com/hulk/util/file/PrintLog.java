@@ -3,12 +3,11 @@ package com.hulk.util.file;
 import com.hulk.util.common.FileUtils;
 import com.hulk.util.file.TxtFile;
 
-import hulk.util.HulkDateUtil;
+import hulk.util.DateTimeUtil;
 import hulk.util.PrintUtil;
 
 import com.hulk.model.pc.core.OnWarehouseListener;
 import com.hulk.model.pc.core.SysLog;
-import com.hulk.model.pc.test.HulkTestConsumer;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -1304,7 +1303,7 @@ public class PrintLog {
     	//若果按照日期命名的文件不是今天的，就使用重新创建文件
     	if(mTxtFile != null && mTxtFile.exists()) {
     		long now = System.currentTimeMillis();
-    		String todayStr = HulkDateUtil.formatDateStr(now);
+    		String todayStr = DateTimeUtil.formatDateStr(now);
     		String filepath = mTxtFile.getFilePath();
 			if(!filepath.contains(todayStr)) {
 				mTxtFile = createNewFile(false);

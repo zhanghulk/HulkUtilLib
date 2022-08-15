@@ -5,6 +5,8 @@ import java.io.PrintStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 
+import hulk.util.DateTimeUtil;
+
 /**
  * 系统日志打印工具类
  * @author zhanghao
@@ -13,13 +15,6 @@ import java.text.SimpleDateFormat;
 public class SysLog {
 	
 	private static String TAG = "SysLog";
-	/**
-	 * "yyyy-MM-dd HH:mm:ss.SSS"
-	 */
-	public static final String MILLI_SECOND_FORMAT_STR = "yyyy-MM-dd HH:mm:ss.SSS";
-	public static final DateFormat TIME_MILLI_SECOND_FORMAT = new SimpleDateFormat(MILLI_SECOND_FORMAT_STR);
-	public static final DateFormat TIME_SECOND_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-	public static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 	public static final String ANDROID_LOG_FORMAT = "%s %s %s/%s: %s";
 
 	public static void v(String tag, String text) {
@@ -263,8 +258,8 @@ public class SysLog {
      * @param timeMillis
      * @return
      */
-	public static String formatDataStr(long timeMillis) {
-        return DATE_FORMAT.format(timeMillis);
+	public static String formatDateStr(long timeMillis) {
+        return DateTimeUtil.formatDateStr(timeMillis);
     }
 	
 	/**
@@ -273,7 +268,7 @@ public class SysLog {
      * @return
      */
 	public static String formatTimeSecond(long timeMillis) {
-        return TIME_SECOND_FORMAT.format(timeMillis);
+        return DateTimeUtil.formatTimeSecond(timeMillis);
     }
 	
 	/**
@@ -282,7 +277,7 @@ public class SysLog {
      * @return
      */
 	public static String formatTimeMillisecond(long timeMillis) {
-        return TIME_MILLI_SECOND_FORMAT.format(timeMillis);
+		return DateTimeUtil.formatTimeMillisecond(timeMillis);
     }
 	
 	/**
