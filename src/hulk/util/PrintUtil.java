@@ -15,7 +15,9 @@ import hulk.text.TextUtils;
  */
 public class PrintUtil {
 	
-	private static String TAG = "PrintUtil";
+	private static final String TAG = "PrintUtil";
+	public static final byte[] NEW_LINE_CHAR_DATA = "\n".getBytes();
+	public static final String ANDROID_LOG_FORMAT = "%s %s %s/%s: %s";
 	
 	public static void v(String tag, String text) {
 		v(tag, text, null);
@@ -80,18 +82,19 @@ public class PrintUtil {
     }
 	
 	public static String formatLogStr(String level, String tag, String text, String threadInfo) {
+    	String timeStr = getLogCurentTime();
+    	String tStr = fixThreadInfo(threadInfo);
+    	//"%s %s %s/%s: %s"
+    	String msg = String.format(ANDROID_LOG_FORMAT, timeStr, tStr, level, tag, text);
+        return msg;
+    }
+	
+	public static String formatLogStr2(String level, String tag, String text, String threadInfo) {
     	StringBuffer buff = new StringBuffer();
-    	buff.append(getLogCurentTime());
-    	String tStr = "";
-    	if(threadInfo == null || threadInfo.equals("")) {
-    		Thread t = Thread.currentThread();
-    		tStr = t.getName() + "-" + t.getId();
-    	} else {
-    		tStr = threadInfo;
-    	}
-    	if(tStr != null && !tStr.equals("")) {
-    		buff.append("  ").append(tStr);
-    	}
+    	String timeStr = getLogCurentTime();
+    	buff.append(timeStr);
+    	String tStr = fixThreadInfo(threadInfo);
+    	buff.append("  ").append(tStr);
     	buff.append("  ").append(level);
     	buff.append("  ").append(tag).append(": ").append(text);
         return buff.toString();
@@ -195,21 +198,20 @@ public class PrintUtil {
      * @return
      */
     public static String formatStackTrace(String text, Throwable e) {
+        if (text == null) {
+            return text;
+        }
         if (e == null) {
             return text;
         }
         ByteArrayOutputStream baos = null;
         try {
             baos = new ByteArrayOutputStream();
-            if (text != null) {
-            	text = text + "\n";
-                //text放在e的trace上面
-                baos.write(text.getBytes());
-            }
+            //text放在e的trace上面
+            baos.write(text.getBytes());
+            baos.write(NEW_LINE_CHAR_DATA);
             PrintStream ps = new PrintStream(baos);
-            if (e != null) {
-                e.printStackTrace(ps);
-            }
+            e.printStackTrace(ps);
             String str = baos.toString();
             return str;
         } catch (Exception ex) {
@@ -270,4 +272,18 @@ public class PrintUtil {
         String msg = builder.toString();
         return msg;
     }
+    
+    /**
+     * 修复线程信息：如果为null取当前线程信息
+     * @param threadInfo
+     * @return
+     */
+    public static String fixThreadInfo(String threadInfo) {
+		if(threadInfo != null && !threadInfo.equals("")) {
+			return threadInfo;
+		}
+		Thread t = Thread.currentThread();
+		String tStr = t.getName() + "-" + t.getId();
+		return tStr;
+	}
 }
