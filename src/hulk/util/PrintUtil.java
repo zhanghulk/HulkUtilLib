@@ -278,24 +278,61 @@ public class PrintUtil {
      * @param args 参数值
      */
     public static String buildFuncLogMsg(String func, String text, Object... args) {
+        String msg = buildLogMsg(func, text, args);
+        return msg;
+    }
+    
+    /**
+     * 构建log信息
+     *
+     * @param func
+     * @param msgFormat
+     * @param args
+     * @return
+     */
+    public static String buildLogMsg(String func, String msgFormat, Object... args) {
+        return buildLogMsg(func, msgFormat, null, args);
+    }
+
+    /**
+     * 构建log信息
+     *
+     * @param func
+     * @param msgFormat
+     * @param th
+     * @param args
+     * @return
+     */
+    public static String buildLogMsg(String func, String msgFormat, Throwable th, Object... args) {
         StringBuilder builder = new StringBuilder();
         boolean hasFunc = !TextUtils.isEmpty(func);
         if (hasFunc) {
-            builder.append(func).append(": ");
-        }
-        boolean hasMsg = !TextUtils.isEmpty(text);
-        if (hasMsg) {
-            builder.append(text);
-        }
-        if (args != null) {
-            if (hasMsg && !text.endsWith("=")) {
-                builder.append(", args=");
+            builder.append(func);
+            if (!func.endsWith(":") && !func.endsWith(": ")) {
+                builder.append(": ");
             }
-            builder.append(Arrays.toString(args));
         }
-        String msg = builder.toString();
-        return msg;
+        //格式化
+        String msg;
+        if (args != null && args.length > 0) {
+            try {
+                msg = String.format(msgFormat, args);
+                builder.append(msg);
+            } catch (Throwable throwable) {
+                //失败后直接拼字符串,避免出现日志打印崩溃
+                builder.append(msgFormat).append("=").append(Arrays.toString(args));
+            }
+        } else {
+            msg = msgFormat;
+            builder.append(msg);
+        }
+        if (th != null) {
+            //加上栈信息
+            builder.append("\n").append(Log.getStackTraceString(th));
+        }
+        return builder.toString();
     }
+
     
     /**
      * 修复线程信息：如果为null取当前线程信息
