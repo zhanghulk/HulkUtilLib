@@ -8,9 +8,9 @@ public class DateTimeUtil {
 	/**
 	 * "yyyy-MM-dd HH:mm:ss.SSS"
 	 */
-	public static final String MILLI_SECOND_FORMAT_STR = "yyyy-MM-dd HH:mm:ss.SSS";
+	public static final String MILLI_SECOND_FORMAT_STR = "yyyy-MM-dd_HH-mm-ss.SSS";
 	public static final DateFormat TIME_MILLI_SECOND_FORMAT = new SimpleDateFormat(MILLI_SECOND_FORMAT_STR);
-	public static final DateFormat TIME_SECOND_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	public static final DateFormat TIME_SECOND_FORMAT = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
 	public static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 	
 	/**
@@ -50,4 +50,16 @@ public class DateTimeUtil {
         DateFormat df = new SimpleDateFormat(format);
         return df.format(timeMillis);
     }
+	
+	public static void main(String[] args) {
+		long timeMillis = System.currentTimeMillis();
+		String dateStr = formatDateStr(timeMillis);
+		System.out.println("dateStr: " + dateStr);
+		
+		String timeSecond = formatTimeSecond(timeMillis);
+		System.out.println("timeSecond: " + timeSecond);
+		
+		String timeMillisecond = formatTimeMillisecond(timeMillis);
+		System.out.println("timeMillisecond: " + timeMillisecond);
+	}
 }
