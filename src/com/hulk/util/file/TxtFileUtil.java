@@ -299,15 +299,41 @@ public class TxtFileUtil {
         	dirPath = dirPath + "/";
         }
         String filePath = dirPath + createCurrentFileName(extension, timeMode);
-        String pre = prefix != null ? prefix.trim() : null;
+        String pre = fixFilenamePrefix(prefix);
         String fileName;
         if(pre != null && !"".equals(pre)) {
-        	fileName = pre + "-" + createCurrentFileName(extension, timeMode);
+        	fileName = pre + "_" + createCurrentFileName(extension, timeMode);
         } else {
         	fileName = createCurrentFileName(extension, timeMode);
         }
         filePath = dirPath + fileName;
     	return filePath;
+    }
+    
+    public static String fixFilenamePrefix(String srcPrefix) {
+    	if(srcPrefix == null) {
+    		return null;
+    	}
+    	if(srcPrefix.isEmpty()) {
+    		return null;
+    	}
+    	String prefix = srcPrefix.trim();
+    	if(prefix.contains(":")) {
+    		prefix = prefix.replace(":", "_");
+    	}
+    	if(prefix.contains(";")) {
+    		prefix = prefix.replace(";", "_");
+    	}
+    	if(prefix.contains("/")) {
+    		prefix = prefix.replace("/", "_");
+    	}
+    	if(prefix.contains("/")) {
+    		prefix = prefix.replace("/", "_");
+    	}
+    	if(prefix.contains("!")) {
+    		prefix = prefix.replace("!", "_");
+    	}
+    	return prefix;
     }
     
     /**

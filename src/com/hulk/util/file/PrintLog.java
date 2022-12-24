@@ -58,26 +58,26 @@ public class PrintLog {
     File mDir;
     TxtFile mTxtFile;
   //是否为缓冲区模式，可以减少IO此时，自己控制缓冲区，可以提高效率
-    boolean bufferMode = false;
-    int bufferLength = DEFAULT_BUFFER_LENGTH;
-    StringBuffer buffer;
+    boolean mBufferMode = false;
+    int mBufferLength = DEFAULT_BUFFER_LENGTH;
+    StringBuffer mBuffer;
     Object mBufferLock = new Object();
     //是否每次新起一行
-    boolean lineMode = true;
+    boolean mLineMode = true;
     
     //默认使用日期模式: yyyyMMdd_HHmmss.txt, false: yyyyMMdd.txt
-    boolean fileNameTimeMode = false;
-    String fileExtension = FILE_EXTENSION;
-    String logPrefix;//log文件前缀
+    boolean mFileNameTimeMode = false;
+    String mFileExtension = FILE_EXTENSION;
+    String mLogFilePrefix;//log文件前缀
     String customFilename;//log文件名
     
     //limit max file number in dir, but 0 is not to limit
-    int maxFileCount = LOG_MAX_FILE_COUNT;
-    int logFileCount;//log文件数量
-    String[] logFilenames;//单签目录下文件数组
+    int mMaxFileCount = LOG_MAX_FILE_COUNT;
+    int mLogFileCount;//log文件数量
+    String[] mLogFilenames;//单签目录下文件数组
     
-    //限制文件大小,最近文件进行判断穿件文件
-    long maxFileLength = FILE_LENGTH_LIMIT;
+    //限制文件大小,最近文件进行判断文件
+    long mMaxFileLength = FILE_LENGTH_LIMIT;
     
     Object mWriteFileLock = new Object();
     private volatile boolean mLogSyncWriting = false;
@@ -102,54 +102,59 @@ public class PrintLog {
     
     public PrintLog(String dir) {
     	this.mDir = new File(dir);
-    	init();
+    }
+    
+    public PrintLog(String dir, String logFilePrefix) {
+    	this.mDir = new File(dir);
+    	this.mLogFilePrefix = logFilePrefix;
     }
 
     public PrintLog(String dir, boolean bufferMode, int bufferLength) {
     	this.mDir = new File(dir);
-        this.bufferMode = bufferMode;
-        this.bufferLength = bufferLength;
-        init();
+        this.mBufferMode = bufferMode;
+        this.mBufferLength = bufferLength;
+    }
+    
+    public PrintLog(String dir, String logFilePrefix, boolean bufferMode, int bufferLength) {
+    	this.mDir = new File(dir);
+    	this.mLogFilePrefix = logFilePrefix;
+        this.mBufferMode = bufferMode;
+        this.mBufferLength = bufferLength;
     }
     
     public PrintLog(TxtFile file, boolean bufferMode, boolean lineMode) {
     	this.mTxtFile = file;
     	this.mDir = getParentDirFile();
-        this.bufferMode = bufferMode;
-        this.lineMode = lineMode;
-        init();
+        this.mBufferMode = bufferMode;
+        this.mLineMode = lineMode;
     }
     
     public void setMaxFileCount(int maxFileCount) {
-    	this.maxFileCount = maxFileCount;
+    	this.mMaxFileCount = maxFileCount;
     }
     
     public int getMaxFileCount() {
-    	return this.maxFileCount;
+    	return this.mMaxFileCount;
     }
     
     public int getLogFileCount() {
-    	return this.logFileCount;
+    	return this.mLogFileCount;
     }
     
     public String[] getLogFilenames() {
-    	return this.logFilenames;
+    	return this.mLogFilenames;
     }
     
     public void setMaxFileLength(long maxFileLength) {
-    	this.maxFileLength = maxFileLength;
+    	this.mMaxFileLength = maxFileLength;
     }
     
     public long getMaxFileLength() {
-    	return this.maxFileLength;
-    }
-    
-    public void setLogPrefix(String logPrefix) {
-    	this.logPrefix = logPrefix;
+    	return this.mMaxFileLength;
     }
     
     public String getLogPrefix() {
-    	return this.logPrefix;
+    	return this.mLogFilePrefix;
     }
     
     public void setLogFilemane(String logFilename) {
@@ -167,24 +172,28 @@ public class PrintLog {
 	}
     
     public void setFileExtension(String extension) {
-    	fileExtension = extension;
+    	mFileExtension = extension;
 	}
     
     public void setFileNameTimeMode(boolean timeMode) {
-    	fileNameTimeMode = timeMode;
+    	mFileNameTimeMode = timeMode;
     }
     
+    public void setLogFilePrefix(String filePrefix) {
+    	mLogFilePrefix = filePrefix;
+	}
+    
     public void setBufferMode(boolean bufferMode) {
-    	this.bufferMode = bufferMode;
+    	this.mBufferMode = bufferMode;
     	ensureBuffer();
     }
     
     public void setBufferLength(int bufferLength) {
-    	this.bufferLength = bufferLength;
+    	this.mBufferLength = bufferLength;
     }
     
     public void setLineMode(boolean lineMode) {
-    	this.lineMode = lineMode;
+    	this.mLineMode = lineMode;
     }
 
     /**
@@ -341,7 +350,7 @@ public class PrintLog {
      */
     public String formatLogStr(String level, String tag, String text, String threadInfo, Throwable e) {
     	String str = PrintUtil.formatLogStr(level, tag, text, threadInfo, e);
-    	if (lineMode) {
+    	if (mLineMode) {
     		return "\n" + str;
     	}
     	return str;
@@ -446,7 +455,7 @@ public class PrintLog {
      */
     public PrintLog appendToBuffer(String str) throws Exception {
     	ensureBuffer();
-		buffer.append(str);
+		mBuffer.append(str);
 		flushBuffer();
 		return this;
     }
@@ -521,8 +530,8 @@ public class PrintLog {
     		//Ignored invalid buffer
     		return false;
     	}
-    	int length = buffer.length();
-    	if(length > bufferLength) {
+    	int length = mBuffer.length();
+    	if(length > mBufferLength) {
     		return true;
     	}
     	if(isBufferMaxExceeding()) {
@@ -542,7 +551,7 @@ public class PrintLog {
     		//Ignored invalid buffer
     		return false;
     	}
-    	int length = buffer.length();
+    	int length = mBuffer.length();
     	if(length > MAX_BUFFER_LENGTH) {
     		//超最大限制必须写入，或者清除缓存避免OOM
     		return true;
@@ -556,10 +565,10 @@ public class PrintLog {
      * @return
      */
     public String getBufferStr() {
-    	if(buffer == null) {
+    	if(mBuffer == null) {
     		return "";
     	}
-    	return buffer.toString();
+    	return mBuffer.toString();
     }
     
     /**
@@ -579,18 +588,18 @@ public class PrintLog {
      * @return cleared string length
      */
     public int clearBuffer() {
-    	if(buffer == null) {
+    	if(mBuffer == null) {
     		return -1;
     	}
     	if(isBufferEmpty()) {
     		//Ignored invalid buffer
     		return 0;
     	}
-    	int len = buffer.length();
+    	int len = mBuffer.length();
     	//delete包前不包后
 		//buffer.delete(0, len);
     	//setLength效率不delete高
-		buffer.setLength(0);
+		mBuffer.setLength(0);
         return len;
     }
     
@@ -599,7 +608,7 @@ public class PrintLog {
      * @return
      */
     public boolean isBufferEmpty() {
-    	if(buffer == null || buffer.length() <= 0) {
+    	if(mBuffer == null || mBuffer.length() <= 0) {
     		return true;
     	}
     	return false;
@@ -613,10 +622,11 @@ public class PrintLog {
      * @throws Exception 
      */
     private boolean write(String text, boolean append) throws Exception {
-    	if(bufferMode) {
+    	if(mBufferMode) {
         	appendToBuffer(text);
         	return true;
     	}
+    	initIfNeed();
     	return writeToFileSync(text, append);
     }
     
@@ -636,9 +646,10 @@ public class PrintLog {
      * @throws Exception 
      */
     private boolean writeToFile(String text, boolean append) throws Exception {
+    	initIfNeed();
     	if(!isInited()) {
     		if(isDebugMode()) {
-    			SysLog.e(TAG, "writeToFileSync: Not inited");
+    			SysLog.e(TAG, "writeToFile: Not inited");
     		}
     		return false;
     	}
@@ -704,7 +715,7 @@ public class PrintLog {
     		if(mTxtFile == null) {
         		//为空说明之前初始化时已经失败，此处没不要重复创建，有些设备会耗时过长，出现ANR
     			if(isDebugMode()) {
-        			SysLog.e(TAG, "writeToFileAsync: mLogConsumer is null");
+        			SysLog.e(TAG, "writeToFileSync: mLogConsumer is null");
         		}
         		return false;
         	}
@@ -737,19 +748,30 @@ public class PrintLog {
      */
     public void init() {
 		try {
-			PrintUtil.i(TAG, "init： Starting.");
+			PrintUtil.w(TAG, "init： Starting.");
 			if(mWriteLogAsyncMode) {
-				PrintUtil.i(TAG, "init： init Log Consumer");
+				PrintUtil.w(TAG, "init： init Log Consumer");
 				initLogConsumer();
 			}
 			//确保日志文件存在
 			initLogFile();
 			renderFiles();
 			mInited = true;
-			PrintUtil.i(TAG, "init： Finsihed.");
+			PrintUtil.w(TAG, "init： Finsihed.");
 		} catch (Throwable e) {
 			PrintUtil.e(TAG, "init failed: " + e, e);
+			mInited = false;
 		}
+    }
+    
+    /**
+     * 初始化日志文件
+     * @throws IOException 
+     */
+    public void initIfNeed() {
+    	if(!isInited()) {
+    		init();
+    	}
     }
     
     /**
@@ -980,7 +1002,7 @@ public class PrintLog {
      * 列出文件,文件数量过多，删除旧的文件
      */
     public void doRenderFiles() {
-    	logFileCount = 0;
+    	mLogFileCount = 0;
     	renderDirFilenames();
 		deleteOldFiles();
     }
@@ -1003,7 +1025,7 @@ public class PrintLog {
     		return;
     	}
     	//列出dir下的文件列表，仅文件名不含签名路径,如果需要文件请使用dir.listFIles();
-		logFilenames = mDir.list(new FilenameFilter() {
+		mLogFilenames = mDir.list(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
             	if(dir != null && name != null) {
@@ -1019,10 +1041,10 @@ public class PrintLog {
                 return true;
             }
         });
-		if(logFilenames != null) {
-			logFileCount = logFilenames.length;
+		if(mLogFilenames != null) {
+			mLogFileCount = mLogFilenames.length;
 		}
-		PrintUtil.w(TAG, "renderDirFilenames： logFileCount= " + logFileCount);
+		PrintUtil.w(TAG, "renderDirFilenames： logFileCount= " + mLogFileCount);
     }
     
     /**
@@ -1034,9 +1056,9 @@ public class PrintLog {
     		PrintUtil.w(TAG, "deleteOldFiles： Not existed dir: " + mDir);
     		return 0;
     	}
-    	if(maxFileCount > 0 && logFileCount > maxFileCount) {
-    		int deletedCount = FileUtils.deleteOldFiles(mDir, maxFileCount, LOCKED_FLAG);
-    		PrintUtil.w(TAG, "deleteOldFiles： count= " + deletedCount + ", maxFileCount= " + maxFileCount);
+    	if(mMaxFileCount > 0 && mLogFileCount > mMaxFileCount) {
+    		int deletedCount = FileUtils.deleteOldFiles(mDir, mMaxFileCount, LOCKED_FLAG);
+    		PrintUtil.w(TAG, "deleteOldFiles： count= " + deletedCount + ", maxFileCount= " + mMaxFileCount);
     		return deletedCount;
     	}
     	return 0;
@@ -1047,23 +1069,23 @@ public class PrintLog {
      * @return
      */
     public boolean renameExceedLengthFile() {
-    	if(maxFileLength <= 0) {
+    	if(mMaxFileLength <= 0) {
     		return false;
     	}
     	if(mTxtFile == null || !mTxtFile.exists()) {
     		return false;
 		}
     	long length = mTxtFile.length();
-		if(length > maxFileLength) {
-			String filename = TxtFileUtil.createCurrentFileName(fileExtension, true);
+		if(length > mMaxFileLength) {
+			String filename = TxtFileUtil.createCurrentFileName(mFileExtension, true);
 			File dest = new File(mDir, filename);
 			boolean renamed = renameTo(dest);
 			if(renamed) {
 				PrintUtil.i(TAG, "renamed exceed length File: " + mTxtFile + " to " + dest
-						+ ", length= " + length + ", maxFileLength= " + maxFileLength);
+						+ ", length= " + length + ", maxFileLength= " + mMaxFileLength);
 			} else {
 				PrintUtil.w(TAG, "rename exceed length File failed: " + mTxtFile + " to " + dest
-						+ ", length= " + length + ", maxFileLength= " + maxFileLength);
+						+ ", length= " + length + ", maxFileLength= " + mMaxFileLength);
 			}
 			return renamed;
 		}
@@ -1119,19 +1141,28 @@ public class PrintLog {
     	ensureFileExtension();
         String filePath = createCurrentFilePath(timeMode);
     	TxtFile logFile = new TxtFile(filePath);
+    	PrintUtil.w(TAG, "createNewFile: logFile=" + logFile);
     	boolean created = true;
     	if(!logFile.exists()) {
     		created = logFile.createNewFile();
-    		PrintUtil.w(TAG, "create log new file: " + logFile + "" + created);
+    		PrintUtil.w(TAG, "createNewFile: create log new file: " + logFile + "" + created);
     	} else {
-    		PrintUtil.w(TAG, "Existed log file: " + logFile);
+    		PrintUtil.w(TAG, "createNewFile: Existed log file: " + logFile);
     	}
     	return logFile;
     }
     
     public String createCurrentFilePath(boolean timeMode) {
     	String dir = getDirPath();
-    	String filePath = TxtFileUtil.createFilePath(dir, logPrefix, fileExtension, timeMode);
+    	String filePath = createFilePath(dir, timeMode);
+    	return filePath;
+    }
+    
+    public String createFilePath(String dir, boolean timeMode) {
+    	PrintUtil.w(TAG, "createFilePath: dir=" + dir + ", logFilePrefix=" + mLogFilePrefix
+    			 + ", fileExtension=" + mFileExtension + ", timeMode=" + timeMode);
+    	String filePath = TxtFileUtil.createFilePath(dir, mLogFilePrefix, mFileExtension, timeMode);
+    	PrintUtil.w(TAG, "createFilePath: filePath=" + filePath);
     	return filePath;
     }
     
@@ -1164,7 +1195,7 @@ public class PrintLog {
      */
     public TxtFile createLogFile() throws IOException {
     	TxtFile file = null;
-    	if(fileNameTimeMode) {
+    	if(mFileNameTimeMode) {
     		file = createNewFile(true);
     	} else {
     		file = createNewFile(false);
@@ -1229,6 +1260,7 @@ public class PrintLog {
      */
     public void initTxtFile() throws IOException {
     	createTxtFile();
+    	renameExceedLengthFile();
     	recreateTxtFileIfNeed();
     }
     
@@ -1243,7 +1275,7 @@ public class PrintLog {
     		File file= new File(mDir, customFilename);
     		mTxtFile = new TxtFile(file);
     	} else {
-    		//自动创建文件名,安札当前日期时间创建
+    		//自动创建文件名,当前日期时间创建
     		mTxtFile = createLogFile();
     	}
     	setLogConsumerFile(mTxtFile, false);
@@ -1251,7 +1283,7 @@ public class PrintLog {
     }
     
     /**
-     * 
+     * 若果按照日期命名的文件超过了最大长度，就使用时间秒来命名，避免同一个文件过大
      * @return
      * @throws IOException
      */
@@ -1286,7 +1318,7 @@ public class PrintLog {
     	//若果按照日期命名的文件超过了最大长度，就使用时间秒来命名，避免同一个文件过大
     	if(mTxtFile != null && mTxtFile.exists()) {
     		long length = mTxtFile.length();
-			if(length > maxFileLength || length > FILE_LENGTH_LIMIT) {
+			if(length > mMaxFileLength || length > FILE_LENGTH_LIMIT) {
 				mTxtFile = createNewFile(true);
 				return true;
 			}
@@ -1335,14 +1367,14 @@ public class PrintLog {
     }
     
     private void ensureFileExtension() {
-    	if(fileExtension == null || fileExtension.equals("")) {
-    		fileExtension = FILE_EXTENSION;
+    	if(mFileExtension == null || mFileExtension.equals("")) {
+    		mFileExtension = FILE_EXTENSION;
     	}
     }
     
     private void ensureBuffer() {
-    	if(buffer == null) {
-    		this.buffer = new StringBuffer();
+    	if(mBuffer == null) {
+    		this.mBuffer = new StringBuffer();
     	}
     }
     
@@ -1358,11 +1390,11 @@ public class PrintLog {
     @Override
     public String toString() {
 		return "PrintLog[mTxtFile= "+ mTxtFile
-				+ ", logPrefix= " + logPrefix
-				+ ", bufferMode= " + bufferMode
-				+ ", logFileCount= " + logFileCount
-				+ ", maxFileCount= " + maxFileCount
-				+ ", maxFileLength= " + maxFileLength
+				+ ", logFilePrefix= " + mLogFilePrefix
+				+ ", bufferMode= " + mBufferMode
+				+ ", logFileCount= " + mLogFileCount
+				+ ", maxFileCount= " + mMaxFileCount
+				+ ", maxFileLength= " + mMaxFileLength
 				+ ", mWriteLogAsyncMode= " + mWriteLogAsyncMode
 				+ ", mLogConsumer= " + mLogConsumer
 				+ ", mLogWarehouse= " + mLogWarehouse
